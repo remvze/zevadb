@@ -104,14 +104,14 @@ db.addMigration("Add createdAt to posts", (prevData) => {
 ```
 
 - Each migration has a name and a function.
-- Migrations are applied sequentially based on \_version.
+- Migrations are applied sequentially based on `_version`.
 - After migrations, the database automatically updates its version and saves.
 
 #### Migration Workflow
 
-1. Add migrations before calling db.read().
+1. Add migrations before calling `db.read()`.
 2. ZevaDB will:
-   - Detect the current \_version of the database file.
+   - Detect the current `_version` of the database file.
    - Apply all pending migrations sequentially.
    - Save the updated file after migration.
 3. If the DB file is corrupted, ZevaDB will backup the old file and reinitialize.
@@ -125,11 +125,3 @@ db.json.backup-<timestamp>
 ```
 
 You can inspect or restore backups manually if needed.
-
-### TypeScript Support
-
-ZevaDB is fully typed, including:
-
-- db.data.collectionName inferred from your Zod schemas
-- db.set() type-safe replacement
-- db.addMigration() ensures migrations return correct types
