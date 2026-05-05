@@ -1,34 +1,30 @@
-<div align="center">
-  <h2>ZevaDB 📦</h2>
-  <p>A typesafe JSON file database with Zod schema validation..</p>
-  <a href="https://npmjs.com/package/zevadb"><strong>npm</strong></a> | <a href="https://buymeacoffee.com/remvze">Buy Me a Coffee</a>
-</div>
+# ZevaDB
 
-### Features
+A type-safe JSON file database with Zod schema validation.
+
+## Features
 
 - Fully type-safe collections powered by Zod
-- Read/write JSON files with a single API
-- `db.data` behaves like a normal object, fully typed
-- `.set()` method for type-safe collection replacement
-- Migration system for evolving your database schema
-- Automatic backup of corrupted files
-- TypeScript-first with full inference
+- Type-safe `db.data` and `db.set()`
+- Versioned migrations with automatic persistence after migration
+- Corruption recovery with automatic backup files
+- Atomic writes (temp file + rename)
+- Cross-process write/read lock file to avoid concurrent file races
 
-### Installation
+## Installation
 
 ```bash
 npm install zevadb zod
 ```
 
-> **Note:** ZevaDB required Zod v4 as a peer dependency.
+> Note: ZevaDB requires Zod v4 as a peer dependency.
 
-### Basic Usage
+## Basic usage
 
 ```ts
 import { z } from "zod";
 import { ZevaDB } from "zevadb";
 
-// Define schemas
 const UserSchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -41,55 +37,29 @@ const PostSchema = z.object({
   authorId: z.string(),
 });
 
-// Define schemas object
-const schemas = {
-  users: z.array(UserSchema),
-  posts: z.array(PostSchema),
-} as const;
-
-// Create the database
 const db = new ZevaDB({
   path: "./db.json",
-  schemas,
+  schemas: {
+    users: z.array(UserSchema),
+    posts: z.array(PostSchema),
+  },
   initial: {
     users: [],
     posts: [],
   },
 });
 
-await db.read(); // Load existing data or initialize
+await db.read();
 
-// Add a new user
 db.data.users.push({ id: "1", name: "Alice" });
-
-// Replace entire collection safely
 db.set("users", [{ id: "2", name: "Bob" }]);
 
-await db.write(); // Persist changes
+await db.write();
 ```
 
-### Type-Safe `.set()` Method
+## Migrations
 
-`db.set("collectionName", data)` replaces a collection safely with full type checking:
-
-```ts
-db.set("posts", [
-  {
-    id: "p1",
-    title: "Hello World",
-    content: "This is the first post",
-    authorId: "1",
-  },
-]);
-```
-
-TypeScript will prevent invalid data according to your Zod schema.
-
-### Migrations
-
-ZevaDB includes a built-in migration system to evolve your data structure safely over time.
-
-#### Adding a Migration
+Add migrations before `read()`:
 
 ```ts
 db.addMigration("Add createdAt to posts", (prevData) => {
@@ -97,31 +67,22 @@ db.addMigration("Add createdAt to posts", (prevData) => {
     ...prevData,
     posts: prevData.posts.map((post) => ({
       ...post,
-      createdAt: new Date().toISOString(), // add a new field
+      createdAt: new Date().toISOString(),
     })),
   };
 });
+
+await db.read(); // pending migrations are applied and persisted
 ```
 
-- Each migration has a name and a function.
-- Migrations are applied sequentially based on `_version`.
-- After migrations, the database automatically updates its version and saves.
+## Backup and recovery
 
-#### Migration Workflow
+If the database file is malformed or schema-invalid, ZevaDB moves it to a backup file and reinitializes from `initial`:
 
-1. Add migrations before calling `db.read()`.
-2. ZevaDB will:
-   - Detect the current `_version` of the database file.
-   - Apply all pending migrations sequentially.
-   - Save the updated file after migration.
-3. If the DB file is corrupted, ZevaDB will backup the old file and reinitialize.
-
-### Backup and Recovery
-
-ZevaDB automatically backs up the database before reinitializing in case of corruption:
-
-```
-db.json.backup-<timestamp>
+```text
+<db-path>.backup-<timestamp>
 ```
 
-You can inspect or restore backups manually if needed.
+## Concurrency notes
+
+ZevaDB uses a lock file (`<db-path>.lock`) to serialize file operations across processes and reduces write corruption risk with atomic writes. In a multi-writer setup, last successful write still wins.
