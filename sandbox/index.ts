@@ -26,6 +26,10 @@ const run = async () => {
   });
 
   await db.read();
+
+  db.data.users.push({ email: "test@gmail.com", password: "password" });
+
+  await db.write();
 };
 
 run();
